@@ -38,28 +38,25 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+# CORS configurado para desarrollo y producción
+# En producción, reemplaza con tu dominio específico (e.g., ["https://tuapp.onrender.com"])
 CORS(app, origins=["*"], methods=["GET", "POST", "OPTIONS"])
 
-# Configuración de API de IA (prioriza variable de entorno, luego fallback)
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or "AIzaSyDBv91sukUg8BHVLde_1Jf5LjTNUyN4eKE"
+# Configuración de API de IA (SOLO desde variable de entorno)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
-    logger.error("❌ GOOGLE_API_KEY no encontrada")
-    raise ValueError("Se requiere GOOGLE_API_KEY")
+    logger.error("❌ GOOGLE_API_KEY no encontrada en variables de entorno")
+    logger.error("💡 Crea un archivo .env con: GOOGLE_API_KEY=tu_api_key")
+    raise ValueError("Se requiere GOOGLE_API_KEY en archivo .env")
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # ============================================================
-# BASE DE DATOS SIMULADA
+# AUTENTICACIÓN COMPLETAMENTE REMOVIDA DEL BACKEND
 # ============================================================
-users_db = {
-    '1234567890': {
-        'name': 'Usuario Demo',
-        'password': 'demo123',
-        'cedula': '1234567890',
-        'created_at': str(datetime.now())
-    }
-}
+# Toda la autenticación se maneja en el frontend con Supabase
+# No hay base de datos ni usuarios en el backend
 
 # ============================================================
 # CLASE EVALUADOR CON IA (GEMINI) - MEJORADO
@@ -343,78 +340,10 @@ def _safe_parse_shapes_response(raw_text):
     return []
 
 # ============================================================
-# ENDPOINTS DE AUTENTICACIÓN
+# AUTENTICACIÓN REMOVIDA - SOLO ENDPOINTS DE IA
 # ============================================================
-@app.route('/register', methods=['POST'])
-def register():
-    """Registro de nuevos usuarios con cédula"""
-    data = request.json
-    cedula = data.get('cedula', '').strip()
-    password = data.get('password', '')
-    name = data.get('name', '').strip()
-    
-    if not cedula or not password or not name:
-        return jsonify({'error': 'Todos los campos son requeridos'}), 400
-    
-    if not cedula.isdigit():
-        return jsonify({'error': 'La cédula debe contener solo números'}), 400
-    
-    if cedula in users_db:
-        return jsonify({'error': 'Esta cédula ya está registrada'}), 400
-    
-    if len(password) < 6:
-        return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
-    
-    users_db[cedula] = {
-        'name': name,
-        'password': password,
-        'cedula': cedula,
-        'created_at': str(datetime.now())
-    }
-    
-    logger.info(f"Usuario registrado: {cedula} - {name}")
-    
-    return jsonify({
-        'message': 'Usuario registrado exitosamente',
-        'user': {
-            'cedula': cedula,
-            'name': name
-        }
-    }), 201
-
-@app.route('/login', methods=['POST'])
-def login():
-    """Login de usuarios con cédula y rol"""
-    data = request.json
-    cedula = data.get('cedula', '').strip()
-    password = data.get('password', '')
-    role = data.get('role', 'estudiante').lower()
-    
-    if not cedula or not password:
-        return jsonify({'error': 'Cédula y contraseña son requeridos'}), 400
-    
-    user = users_db.get(cedula)
-    if not user:
-        return jsonify({'error': 'Cédula no encontrada'}), 404
-    
-    if user['password'] != password:
-        return jsonify({'error': 'Contraseña incorrecta'}), 401
-    
-    if role not in ['profesor', 'estudiante']:
-        return jsonify({'error': 'Rol inválido. Debe ser profesor o estudiante'}), 400
-    
-    welcome_msg = 'Login exitoso - Profesor evaluador PDF' if role == 'profesor' else 'Login exitoso - Estudiante'
-    
-    logger.info(f"Login exitoso: {cedula} como {role}")
-    
-    return jsonify({
-        'message': welcome_msg,
-        'user': {
-            'cedula': cedula,
-            'name': user['name'],
-            'role': role
-        }
-    }), 200
+# Los endpoints de autenticación han sido eliminados
+# Toda la autenticación se maneja en el frontend con Supabase
 
 # ============================================================
 # ENDPOINTS DE GENERACIÓN DE PREGUNTAS
@@ -1280,7 +1209,7 @@ if __name__ == '__main__':
     print("🚀 ICFES PRO - BACKEND UNIFICADO")
     print("=" * 60)
     print(f"🔑 Google Gemini API: {'✅ Configurada' if GOOGLE_API_KEY else '❌ No encontrada'}")
-    print(f"👥 Usuario Demo: Cédula: 1234567890 | Password: demo123")
+    print(f"👥 Autenticación: Supabase (sin usuarios demo)")
     print("🌐 Servidor: http://127.0.0.1:5000")
     print("=" * 60)
     print("\n📋 ENDPOINTS DISPONIBLES:")
