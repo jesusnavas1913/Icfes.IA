@@ -1162,14 +1162,8 @@ Enunciado:
 @app.route('/users', methods=['GET'])
 def get_users():
     """Endpoint para ver usuarios registrados (solo para desarrollo)"""
-    users_list = []
-    for cedula, user_data in users_db.items():
-        users_list.append({
-            'cedula': cedula,
-            'name': user_data['name'],
-            'created_at': user_data.get('created_at', 'N/A')
-        })
-    return jsonify({'users': users_list, 'total': len(users_list)}), 200
+    # Autenticación removida - retornar lista vacía
+    return jsonify({'users': [], 'total': 0, 'message': 'Autenticación manejada en frontend con Supabase'}), 200
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -1188,8 +1182,9 @@ def health_check():
             "ai_api": "connected" if ai_status else "error",
             "ai_provider": "Gemini",
             "model": evaluator.default_model,
-            "users_registered": len(users_db),
-            "version": "ICFES Pro Backend Unificado v1.0"
+            "users_registered": 0,
+            "version": "ICFES Pro Backend Unificado v1.0",
+            "auth_note": "Autenticación manejada en frontend con Supabase"
         })
     except Exception as e:
         return jsonify({
@@ -1198,7 +1193,8 @@ def health_check():
             "ai_api": "error",
             "ai_provider": "Gemini",
             "error": str(e),
-            "users_registered": len(users_db)
+            "users_registered": 0,
+            "auth_note": "Autenticación manejada en frontend con Supabase"
         }), 200
 
 # ============================================================
