@@ -39,8 +39,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 # CORS configurado para desarrollo y producción
-# En producción, reemplaza con tu dominio específico (e.g., ["https://tuapp.onrender.com"])
-CORS(app, origins=["*"], methods=["GET", "POST", "OPTIONS"])
+# Configurable via variable de entorno para evitar problemas de deploy
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")  # Default * para desarrollo, configura específico en producción
+CORS(app, origins=[CORS_ORIGINS], methods=["GET", "POST", "OPTIONS"])
 
 # Configuración de API de IA (SOLO desde variable de entorno)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -425,29 +426,50 @@ Genera las preguntas ahora:"""
         prompt = base_prompt
         logger.info(f"Generando preguntas sin conocimiento personalizado para: {competencia}")
 
-    try:
-        questions_text = evaluator._make_gemini_request(
-            prompt,
-            temperature=0.7,
-            max_tokens=4096
-        )
+    max_attempts = 2
+    for attempt in range(max_attempts):
+        try:
+            questions_text = evaluator._make_gemini_request(
+                prompt,
+                temperature=0.7,
+                max_tokens=4096
+            )
 
-        if not questions_text or len(questions_text) < 50:
-            return jsonify({'error': 'No se pudieron generar preguntas válidas'}), 500
+            if not questions_text or len(questions_text) < 50:
+                if attempt < max_attempts - 1:
+                    logger.warning(f"Respuesta incompleta en intento {attempt + 1}, reintentando...")
+                    # Hacer prompt más estricto en reintentos
+                    prompt += "\n\nIMPORTANTE: ¡NO omitas NINGÚN elemento! Cada pregunta DEBE incluir Pregunta, 4 opciones (a,b,c,d), Respuesta correcta y Explicación completa."
+                    continue
+                return jsonify({'error': 'No se pudieron generar preguntas válidas'}), 500
 
-        logger.info(f"Preguntas generadas: {competencia} - {dificultad} - {num_questions} - Custom Knowledge: {use_custom_knowledge}")
+            # Validar formato: contar ocurrencias de "Respuesta correcta:"
+            correct_count = questions_text.count("Respuesta correcta:")
+            if correct_count < num_questions:
+                if attempt < max_attempts - 1:
+                    logger.warning(f"Formato incompleto: solo {correct_count} respuestas correctas de {num_questions} requeridas, reintentando...")
+                    # Reforzar prompt
+                    prompt = prompt.replace("Genera las preguntas ahora:", f"Genera las preguntas ahora:\n\nCRÍTICO: Incluye EXACTAMENTE {num_questions} bloques completos con 'Respuesta correcta:' y 'Explicación:' para cada uno.")
+                    continue
+                logger.error(f"Formato incompleto final: {correct_count}/{num_questions}")
+                return jsonify({'error': 'Respuesta incompleta después de reintentos, verifica la API key'}), 500
 
-        return jsonify({
-            'questions': questions_text,
-            'custom_knowledge_used': use_custom_knowledge and competencia in evaluator.custom_knowledge_base,
-            'competencia': competencia,
-            'dificultad': dificultad,
-            'num_questions': num_questions
-        }), 200
+            logger.info(f"Preguntas generadas exitosamente: {competencia} - {dificultad} - {num_questions} - Custom Knowledge: {use_custom_knowledge} (intento {attempt + 1})")
 
-    except Exception as e:
-        logger.error(f"Error generando preguntas: {str(e)}")
-        return jsonify({'error': f'Error al generar preguntas: {str(e)}'}), 500
+            return jsonify({
+                'questions': questions_text,
+                'custom_knowledge_used': use_custom_knowledge and competencia in evaluator.custom_knowledge_base,
+                'competencia': competencia,
+                'dificultad': dificultad,
+                'num_questions': num_questions
+            }), 200
+
+        except Exception as e:
+            logger.error(f"Error en intento {attempt + 1}: {str(e)}")
+            if attempt == max_attempts - 1:
+                return jsonify({'error': f'Error al generar preguntas: {str(e)}'}), 500
+
+    return jsonify({'error': 'Falló después de todos los reintentos'}), 500
 
 # ============================================================
 # ENDPOINTS DE RETROALIMENTACIÓN
