@@ -21,7 +21,9 @@ def pdf_evaluation_page():
     return render_template('icfes_pdf_evaluation.html')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    import os
+    host = '0.0.0.0' if os.getenv('FLASK_ENV') == 'production' else '127.0.0.1'
+    app.run(debug=True, host=host, port=5000)
 else:
     # Para producción con gunicorn
     application = app
