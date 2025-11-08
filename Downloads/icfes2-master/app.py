@@ -6,6 +6,7 @@ import os
 import json
 import re
 import logging
+import time
 
 # Configurar logging
 logging.basicConfig(
@@ -41,16 +42,16 @@ except Exception as e:
 def extraer_json(texto):
     """Extrae y limpia JSON de la respuesta de IA"""
     texto = texto.strip()
-    
+
     # Remover bloques de código markdown
     if texto.startswith('```json'):
         texto = texto[7:].strip()
     elif texto.startswith('```'):
         texto = texto[3:].strip()
-    
+
     if texto.endswith('```'):
         texto = texto[:-3].strip()
-    
+
     # Buscar JSON en el texto
     match = re.search(r'\{.*\}', texto, re.DOTALL)
     if match:
@@ -58,8 +59,26 @@ def extraer_json(texto):
         # Limpiar comas finales
         json_text = re.sub(r',\s*([}\]])', r'\1', json_text)
         return json_text
-    
+
     return texto
+
+def retry_with_backoff(func, max_retries=3, base_delay=1):
+    """Retry function with exponential backoff for rate limits"""
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except Exception as e:
+            if "429" in str(e) or "Resource exhausted" in str(e):
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.warning(f"Rate limit hit, retrying in {delay}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"Max retries reached for rate limit error: {e}")
+                    raise e
+            else:
+                raise e
 
 @app.route('/')
 def home():
@@ -112,13 +131,16 @@ REGLAS:
 4. La explicación debe ser pedagógica y constructiva
 5. Responde SOLO con el JSON, sin texto adicional"""
 
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=1500
+        def generate_single():
+            return model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=1500
+                )
             )
-        )
+
+        response = retry_with_backoff(generate_single)
 
         if not response or not response.text:
             logger.error("Respuesta vacía de Gemini")
@@ -205,13 +227,16 @@ REGLAS CRÍTICAS:
 4. Numera las preguntas desde 1 hasta {cantidad}
 5. Responde SOLO con el JSON válido, sin texto adicional"""
 
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=4000
+        def generate_multiple():
+            return model.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    temperature=0.7,
+                    max_output_tokens=4000
+                )
             )
-        )
+
+        response = retry_with_backoff(generate_multiple)
 
         if not response or not response.text:
             return jsonify({"error": "No se pudo generar las preguntas"}), 500
@@ -273,7 +298,10 @@ Proporciona retroalimentación en formato JSON:
 
 Sé positivo, constructivo y pedagógico."""
 
-        response = model.generate_content(prompt)
+        def generate_feedback():
+            return model.generate_content(prompt)
+
+        response = retry_with_backoff(generate_feedback)
         json_text = extraer_json(response.text)
         feedback = json.loads(json_text)
 
@@ -287,12 +315,15 @@ Sé positivo, constructivo y pedagógico."""
 def health_check():
     """Endpoint de salud del servidor"""
     try:
-        test_response = model.generate_content(
-            "Responde solo 'OK'",
-            generation_config=genai.types.GenerationConfig(max_output_tokens=10)
-        )
+        def test_ai():
+            return model.generate_content(
+                "Responde solo 'OK'",
+                generation_config=genai.types.GenerationConfig(max_output_tokens=10)
+            )
+
+        test_response = retry_with_backoff(test_ai)
         ai_ok = "OK" in test_response.text.upper()
-        
+
         return jsonify({
             "status": "healthy" if ai_ok else "degraded",
             "server": "running",
