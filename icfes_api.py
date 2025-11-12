@@ -38,10 +38,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
+
 # CORS configurado para desarrollo y producción
-# Configurable via variable de entorno para evitar problemas de deploy
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")  # Default * para desarrollo, configura específico en producción
-CORS(app, origins=[CORS_ORIGINS], methods=["GET", "POST", "OPTIONS"])
+# Permitir todos los orígenes para desarrollo local
+CORS(app, methods=["GET", "POST", "OPTIONS"])
 
 # Configuración de API de IA (SOLO desde variable de entorno)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -1222,13 +1223,23 @@ def health_check():
 # ============================================================
 # INICIO DE LA APLICACIÓN
 # ============================================================
-if __name__ == '__main__':
+# Banner de inicio - se muestra siempre al importar el módulo
+# Esto asegura que se vea tanto en desarrollo como en producción (gunicorn)
+_banner_printed = False
+
+def print_startup_banner():
+    """Imprime el banner de inicio de la aplicación"""
+    global _banner_printed
+    if _banner_printed:
+        return
+    _banner_printed = True
+    
     print("=" * 60)
     print("🚀 ICFES PRO - BACKEND UNIFICADO")
     print("=" * 60)
     print(f"🔑 Google Gemini API: {'✅ Configurada' if GOOGLE_API_KEY else '❌ No encontrada'}")
     print(f"👥 Autenticación: Supabase (sin usuarios demo)")
-    print("🌐 Servidor: http://127.0.0.1:5000")
+    print("🌐 Servidor iniciado")
     print("=" * 60)
     print("\n📋 ENDPOINTS DISPONIBLES:")
     print("\n🔐 Autenticación:")
@@ -1241,11 +1252,20 @@ if __name__ == '__main__':
     print("   - POST /analyze-document      - Análisis PDF/Word completo")
     print("\n📊 Visualización de Datos:")
     print("   - POST /generate-visual       - Generar gráficos (bar/pie)")
+    print("   - POST /generate-visual-by-competencia - Gráfico por competencia")
+    print("   - POST /generate-geometry-visual - Figuras geométricas")
     print("\n💾 Modelos de IA:")
     print("   - POST /save-model            - Guardar modelo entrenado")
     print("\n⚙️  Administrativo:")
     print("   - GET  /users                 - Lista de usuarios")
     print("   - GET  /health                - Estado del sistema")
     print("=" * 60)
-    
+    print("")
+
+# Imprimir banner al importar el módulo
+print_startup_banner()
+
+if __name__ == '__main__':
+    print("🌐 Servidor: http://127.0.0.1:5000")
+    print("=" * 60)
     app.run(debug=True, host='127.0.0.1', port=5000)
