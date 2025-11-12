@@ -23,7 +23,8 @@ def pdf_evaluation_page():
 if __name__ == '__main__':
     import os
     host = '0.0.0.0' if os.getenv('FLASK_ENV') == 'production' else '127.0.0.1'
-    app.run(debug=True, host=host, port=5000)
+    debug_mode = os.getenv('FLASK_ENV') != 'production'
+    app.run(debug=debug_mode, host=host, port=5000)
 else:
     # Para producción con gunicorn
     application = app

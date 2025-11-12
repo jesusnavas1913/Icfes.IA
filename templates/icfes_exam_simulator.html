@@ -392,6 +392,7 @@
             <button class="btn-primary" id="restartExamBtn">Realizar otro simulacro</button>
         </div>
     </main>
+    <script src="/static/js/config.js"></script>
     <script>
         const startBtn = document.getElementById('startExamBtn');
         const examContainer = document.getElementById('examContainer');
@@ -508,7 +509,8 @@
         }
 
         async function fetchQuestions(subject, numQuestions, difficulty) {
-            const response = await fetch('http://127.0.0.1:5000/generate-question', {
+            const API_URL = window.API_URL || 'https://icfes-ia.onrender.com';
+            const response = await fetch(`${API_URL}/generate-question`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ competencia: subject, num_questions: numQuestions, dificultad: difficulty })
@@ -610,7 +612,8 @@
             const analysisData = `Resultados del simulacro:\n` +
                 `- Total: ${total}\n- Correctas: ${correctCount}\n- Incorrectas: ${incorrectCount}\n- Éxito: ${successRate}%`;
 
-            fetch('http://127.0.0.1:5000/generate-visual', {
+            const API_URL = window.API_URL || 'https://icfes-ia.onrender.com';
+            fetch(`${API_URL}/generate-visual`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -669,7 +672,8 @@
                 // Cancelar request anterior si existe
                 if (geomAbortController) geomAbortController.abort();
                 geomAbortController = new AbortController();
-                const resp = await fetch('http://127.0.0.1:5000/generate-geometry-visual', {
+                const API_URL = window.API_URL || 'https://icfes-ia.onrender.com';
+                const resp = await fetch(`${API_URL}/generate-geometry-visual`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ question_text: q, title: 'Figura de la Pregunta', competencia, tema }),
