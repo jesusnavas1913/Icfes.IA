@@ -20,6 +20,10 @@ def generator_page():
 def pdf_evaluation_page():
     return render_template('icfes_pdf_evaluation.html')
 
+@app.route('/order-exercise')
+def order_exercise_page():
+    return render_template('icfes_order_exercise.html')
+
 if __name__ == '__main__':
     import os
     host = '0.0.0.0' if os.getenv('FLASK_ENV') == 'production' else '127.0.0.1'

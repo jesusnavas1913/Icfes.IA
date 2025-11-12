@@ -283,6 +283,32 @@
             color: #fff;
         }
 
+        .mode-toggle {
+            display: flex;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .mode-btn {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
         .results-actions {
             display: flex;
             gap: 15px;
@@ -354,6 +380,20 @@
             padding: 15px 20px;
             color: rgba(255, 255, 255, 0.8);
             font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .option-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(102, 126, 234, 0.3);
+            transform: translateX(5px);
+        }
+
+        .option-item.selected {
+            background: rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+            color: #fff;
         }
 
         .correct-answer {
@@ -363,6 +403,12 @@
             font-weight: 700;
         }
 
+        .wrong-answer {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
         .question-explanation {
             background: rgba(102, 126, 234, 0.1);
             border: 1px solid rgba(102, 126, 234, 0.3);
@@ -370,26 +416,66 @@
             padding: 20px;
             color: rgba(255, 255, 255, 0.9);
             line-height: 1.6;
+            margin-top: 15px;
         }
 
-        .loading {
-            text-align: center;
-            padding: 60px 20px;
+        .answer-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
         }
 
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(102, 126, 234, 0.3);
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+        .btn-submit {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        .btn-submit:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .feedback-box {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 15px;
+            animation: slideIn 0.5s ease;
+        }
+
+        .feedback-box.incorrect {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .feedback-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #10b981;
+        }
+
+        .feedback-box.incorrect .feedback-title {
+            color: #ef4444;
+        }
+
+        .feedback-content {
+            color: rgba(255, 255, 255, 0.9);
+            line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         .alert {
@@ -409,6 +495,21 @@
             background: rgba(16, 185, 129, 0.1);
             border: 1px solid rgba(16, 185, 129, 0.3);
             color: #10b981;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         @media (max-width: 768px) {
@@ -517,6 +618,10 @@
         <div class="results-section" id="resultsSection">
             <div class="results-header">
                 <h2 class="results-title">Preguntas Generadas</h2>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" onclick="setMode('view')">👁️ Ver Respuestas</button>
+                    <button class="mode-btn" onclick="setMode('practice')">✍️ Practicar</button>
+                </div>
                 <div class="results-actions">
                     <button class="btn-action" onclick="exportQuestions()">💾 Exportar</button>
                     <button class="btn-action" onclick="printQuestions()">🖨️ Imprimir</button>
@@ -530,10 +635,12 @@
         </div>
     </div>
 
-    <script src="/static/js/config.js"></script>
     <script>
         const API_URL = window.API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://127.0.0.1:5000' : 'https://icfes-ia.onrender.com');
         let generatedQuestions = '';
+        let parsedQuestions = [];
+        let currentMode = 'view';
+        let userAnswers = {};
 
         function showMessage(type, message) {
             const container = document.getElementById('messageContainer');
@@ -579,6 +686,106 @@
             return questions;
         }
 
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            renderQuestions(parsedQuestions);
+        }
+
+        function selectOption(questionIndex, optionLetter) {
+            if (currentMode !== 'practice') return;
+            
+            userAnswers[questionIndex] = optionLetter;
+            
+            // Update UI
+            const card = document.querySelectorAll('.question-card')[questionIndex];
+            card.querySelectorAll('.option-item').forEach(opt => opt.classList.remove('selected'));
+            const selectedOption = card.querySelector(`[data-option="${optionLetter}"]`);
+            if (selectedOption) {
+                selectedOption.classList.add('selected');
+            }
+        }
+
+        async function submitAnswer(questionIndex) {
+            const userAnswer = userAnswers[questionIndex];
+            if (!userAnswer) {
+                alert('Por favor selecciona una respuesta primero');
+                return;
+            }
+
+            const question = parsedQuestions[questionIndex];
+            const isCorrect = userAnswer === question.correctAnswer;
+
+            // Show loading
+            const card = document.querySelectorAll('.question-card')[questionIndex];
+            const actionsDiv = card.querySelector('.answer-actions');
+            actionsDiv.innerHTML = '<div class="loading-spinner"></div>';
+
+            try {
+                // Get AI feedback
+                const response = await fetch(`${API_URL}/get-feedback`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: question.question + '\n' + question.options.join('\n'),
+                        answer: userAnswer
+                    })
+                });
+
+                const data = await response.json();
+
+                // Update UI with results
+                card.querySelectorAll('.option-item').forEach(opt => {
+                    const letter = opt.getAttribute('data-option');
+                    opt.style.pointerEvents = 'none';
+                    
+                    if (letter === question.correctAnswer) {
+                        opt.classList.add('correct-answer');
+                    } else if (letter === userAnswer && !isCorrect) {
+                        opt.classList.add('wrong-answer');
+                    }
+                });
+
+                // Show feedback
+                const feedbackHTML = `
+                    <div class="feedback-box ${isCorrect ? '' : 'incorrect'}">
+                        <div class="feedback-title">
+                            ${isCorrect ? '✅ ¡Respuesta Correcta!' : '❌ Respuesta Incorrecta'}
+                        </div>
+                        <div class="feedback-content">${data.feedback || question.explanation}</div>
+                    </div>
+                `;
+
+                actionsDiv.innerHTML = feedbackHTML;
+
+            } catch (error) {
+                console.error('Error getting feedback:', error);
+                // Fallback to basic feedback
+                card.querySelectorAll('.option-item').forEach(opt => {
+                    const letter = opt.getAttribute('data-option');
+                    opt.style.pointerEvents = 'none';
+                    
+                    if (letter === question.correctAnswer) {
+                        opt.classList.add('correct-answer');
+                    } else if (letter === userAnswer && !isCorrect) {
+                        opt.classList.add('wrong-answer');
+                    }
+                });
+
+                actionsDiv.innerHTML = `
+                    <div class="feedback-box ${isCorrect ? '' : 'incorrect'}">
+                        <div class="feedback-title">
+                            ${isCorrect ? '✅ ¡Respuesta Correcta!' : '❌ Respuesta Incorrecta'}
+                        </div>
+                        <div class="feedback-content">${question.explanation}</div>
+                    </div>
+                `;
+            }
+        }
+
         function renderQuestions(questions) {
             const container = document.getElementById('questionsContainer');
 
@@ -587,29 +794,53 @@
                 return;
             }
 
-            container.innerHTML = questions.map((q, index) => {
-                const correctOption = q.options.find(opt =>
-                    opt.charAt(0).toLowerCase() === q.correctAnswer
-                );
+            parsedQuestions = questions;
 
-                return `
-                    <div class="question-card">
-                        <div class="question-number">Pregunta ${index + 1}</div>
-                        <div class="question-text">${q.question}</div>
-                        <div class="options-list">
-                            ${q.options.map(option => `
-                                <div class="option-item ${option.charAt(0).toLowerCase() === q.correctAnswer ? 'correct-answer' : ''}">
-                                    ${option}
-                                </div>
-                            `).join('')}
-                        </div>
-                        ${q.explanation ? `
-                            <div class="question-explanation">
-                                <strong>Explicación:</strong> ${q.explanation}
+            container.innerHTML = questions.map((q, index) => {
+                if (currentMode === 'view') {
+                    // View mode: show answers
+                    return `
+                        <div class="question-card">
+                            <div class="question-number">Pregunta ${index + 1}</div>
+                            <div class="question-text">${q.question}</div>
+                            <div class="options-list">
+                                ${q.options.map(option => `
+                                    <div class="option-item ${option.charAt(0).toLowerCase() === q.correctAnswer ? 'correct-answer' : ''}">
+                                        ${option}
+                                    </div>
+                                `).join('')}
                             </div>
-                        ` : ''}
-                    </div>
-                `;
+                            ${q.explanation ? `
+                                <div class="question-explanation">
+                                    <strong>Explicación:</strong> ${q.explanation}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                } else {
+                    // Practice mode: interactive
+                    return `
+                        <div class="question-card">
+                            <div class="question-number">Pregunta ${index + 1}</div>
+                            <div class="question-text">${q.question}</div>
+                            <div class="options-list">
+                                ${q.options.map(option => {
+                                    const letter = option.charAt(0).toLowerCase();
+                                    return `
+                                        <div class="option-item" data-option="${letter}" onclick="selectOption(${index}, '${letter}')">
+                                            ${option}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div class="answer-actions">
+                                <button class="btn-submit" onclick="submitAnswer(${index})">
+                                    Verificar Respuesta
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
             }).join('');
         }
 
@@ -634,6 +865,9 @@
             btn.textContent = 'Generando preguntas...';
 
             showMessage('info', 'Generando preguntas con IA...');
+
+            // Reset user answers
+            userAnswers = {};
 
             try {
                 const response = await fetch(`${API_URL}/generate-question`, {
@@ -660,7 +894,6 @@
 
                     showMessage('success', `¡Se generaron ${questions.length} preguntas exitosamente!`);
 
-                    // Log info
                     console.log('Preguntas generadas:', data);
                     console.log('Usó conocimiento personalizado:', data.custom_knowledge_used);
                 } else {
@@ -725,15 +958,23 @@
             document.getElementById('questionsContainer').innerHTML = '';
             document.getElementById('messageContainer').innerHTML = '';
             generatedQuestions = '';
+            parsedQuestions = [];
+            userAnswers = {};
+            currentMode = 'view';
             document.getElementById('competenciaSelect').value = '';
             document.getElementById('numQuestionsInput').value = '5';
             document.getElementById('dificultadSelect').value = 'medio';
             document.getElementById('customKnowledgeSelect').value = 'true';
+            
+            // Reset mode buttons
+            document.querySelectorAll('.mode-btn').forEach((btn, idx) => {
+                if (idx === 0) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
         }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
-            // Focus on first select
             document.getElementById('competenciaSelect').focus();
         });
     </script>

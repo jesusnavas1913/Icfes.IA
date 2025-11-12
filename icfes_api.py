@@ -475,6 +475,91 @@ Genera las preguntas ahora:"""
 # ============================================================
 # ENDPOINTS DE RETROALIMENTACIÓN
 # ============================================================
+@app.route('/evaluate-order', methods=['POST'])
+def evaluate_order():
+    """Evalúa el orden de elementos reordenados por el estudiante"""
+    data = request.json
+    question = data.get('question', '')
+    correct_order = data.get('correct_order', [])  # Lista con el orden correcto
+    user_order = data.get('user_order', [])  # Lista con el orden del usuario
+    items = data.get('items', [])  # Lista de elementos a ordenar
+    
+    if not question or not correct_order or not user_order:
+        return jsonify({'error': 'Pregunta, orden correcto y orden del usuario son requeridos'}), 400
+    
+    if len(correct_order) != len(user_order):
+        return jsonify({'error': 'El número de elementos no coincide'}), 400
+    
+    # Verificar si el orden es correcto
+    is_correct = correct_order == user_order
+    
+    # Generar retroalimentación con IA
+    prompt = f"""Eres un tutor experto y pedagógico. Analiza el ejercicio de reordenamiento realizado por el estudiante.
+
+PREGUNTA/EJERCICIO:
+{question}
+
+ELEMENTOS A ORDENAR:
+{chr(10).join([f"{i+1}. {item}" for i, item in enumerate(items)])}
+
+ORDEN CORRECTO:
+{chr(10).join([f"{i+1}. {correct_order[i]}" for i in range(len(correct_order))])}
+
+ORDEN DEL ESTUDIANTE:
+{chr(10).join([f"{i+1}. {user_order[i]}" for i in range(len(user_order))])}
+
+RESULTADO: {'CORRECTO' if is_correct else 'INCORRECTO'}
+
+Proporciona retroalimentación siguiendo EXACTAMENTE este formato:
+
+**Estado del ordenamiento:** [Indica si es Correcto o Incorrecto]
+
+**Análisis del ordenamiento:**
+[Explica si el orden está correcto o incorrecto, y qué elementos están en la posición correcta o incorrecta]
+
+**Orden correcto:**
+[Lista el orden correcto de los elementos]
+
+**Tu orden:**
+[Lista el orden que proporcionaste]
+
+**Explicación detallada:**
+[Explica por qué este orden es el correcto. Si hay errores, explica qué elementos están mal posicionados y por qué deberían estar en otro orden]
+
+**Errores encontrados:**
+[Si hay errores, lista específicamente qué elementos están mal y dónde deberían estar. Si está correcto, felicita al estudiante]
+
+**Cómo mejorar:**
+[Proporciona consejos específicos para resolver ejercicios de ordenamiento. Incluye estrategias como identificar patrones, relaciones causa-efecto, secuencias temporales, etc.]
+
+**Conceptos clave:**
+[Lista 2-3 conceptos específicos relacionados con este ejercicio que el estudiante debe reforzar]
+
+Sé claro, constructivo y motivador en tu retroalimentación."""
+
+    try:
+        feedback_text = evaluator._make_gemini_request(
+            prompt,
+            temperature=0.6,
+            max_tokens=2048
+        )
+        
+        if not feedback_text:
+            return jsonify({'error': 'No se pudo generar retroalimentación'}), 500
+        
+        logger.info(f"Evaluación de orden completada: {'Correcto' if is_correct else 'Incorrecto'}")
+        
+        return jsonify({
+            'is_correct': is_correct,
+            'feedback': feedback_text,
+            'correct_order': correct_order,
+            'user_order': user_order
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error evaluando orden: {str(e)}")
+        return jsonify({'error': f'Error al evaluar el orden: {str(e)}'}), 500
+
 @app.route('/get-feedback', methods=['POST'])
 def get_feedback():
     """Obtener retroalimentación detallada de la respuesta del estudiante"""
@@ -1248,6 +1333,7 @@ def print_startup_banner():
     print("\n📝 Generación de Preguntas:")
     print("   - POST /generate-question     - Generar preguntas ICFES")
     print("   - POST /get-feedback          - Retroalimentación individual")
+    print("   - POST /evaluate-order         - Evaluar ordenamiento de elementos")
     print("\n📄 Análisis de Documentos:")
     print("   - POST /analyze-document      - Análisis PDF/Word completo")
     print("\n📊 Visualización de Datos:")
