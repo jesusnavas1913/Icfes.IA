@@ -866,7 +866,7 @@ INSTRUCCIONES:
 2. Genera valores numéricos realistas basados en el análisis
 3. Proporciona exactamente 4-6 categorías con valores porcentuales o absolutos
 
-FORMATO JSON obligatorio (responde con el JSON directamente, sin bloques de código markdown):
+FORMATO JSON obligatorio (responda con el JSON directamente, sin bloques de código markdown):
 {{
     "labels": ["Categoría 1", "Categoría 2", "Categoría 3", "Categoría 4"],
     "values": [25, 30, 20, 25],
@@ -1266,6 +1266,190 @@ Enunciado:
         return jsonify({'error': f'Error generando figura: {str(e)}'}), 500
 
 # ============================================================
+# NUEVO ENDPOINT: SUBMIT ALL ANSWERS - VERIFICACIÓN BATCH
+# ============================================================
+@app.route('/submit-all-answers', methods=['POST'])
+def submit_all_answers():
+    """
+    Recibe todas las respuestas del estudiante de una vez,
+    las evalúa y genera retroalimentación para cada una.
+    """
+    try:
+        data = request.json
+        questions = data.get('questions', [])
+
+        if not questions or len(questions) == 0:
+            return jsonify({'error': 'No se proporcionaron preguntas'}), 400
+
+        # Validar que cada pregunta tenga los campos necesarios
+        for i, q in enumerate(questions):
+            if not all(k in q for k in ['question', 'options', 'correctAnswer', 'userAnswer']):
+                return jsonify({'error': f'Pregunta {i+1} con formato inválido'}), 400
+
+        results = []
+        total_questions = len(questions)
+
+        # Procesar cada pregunta
+        for i, q in enumerate(questions):
+            user_answer = q.get('userAnswer', '').lower()
+            correct_answer = q.get('correctAnswer', '').lower()
+            is_correct = user_answer == correct_answer
+
+            # Generar retroalimentación individual con Gemini
+            try:
+                prompt = f"""Eres un tutor experto especializado en ICFES colombiano.
+Dado el siguiente ejercicio y la respuesta del estudiante, genera una retroalimentación clara y constructiva.
+
+PREGUNTA:
+{q['question']}
+
+OPCIONES:
+{chr(10).join(q['options'])}
+
+RESPUESTA DEL ESTUDIANTE: {user_answer.upper()}
+
+RESULTADO: {'CORRECTA' if is_correct else 'INCORRECTA'}
+
+Proporciona la retroalimentación siguiendo EXACTAMENTE este formato:
+
+**Estado de la respuesta:** [Indica si es Correcta o Incorrecta]
+
+**Análisis de tu respuesta:**
+[Explica brevemente qué hizo bien o mal el estudiante]
+
+**Respuesta correcta:**
+[Letra y texto de la opción correcta: {correct_answer.upper()})]
+
+**Explicación detallada:**
+[Explica por qué es correcta y por qué las demás son incorrectas, con referencia al contenido]
+
+**Conceptos clave a repasar:**
+[2-3 conceptos específicos para reforzar]
+
+Sé claro, motivador y educativo. Responda en español."""
+
+                feedback_text = evaluator._make_gemini_request(
+                    prompt,
+                    temperature=0.5,
+                    max_tokens=1500
+                )
+
+                if not feedback_text:
+                    feedback_text = q.get('explanation', 'Sin explicación disponible.')
+
+            except Exception as e:
+                logger.error(f"Error generando feedback para pregunta {i+1}: {str(e)}")
+                feedback_text = q.get('explanation', f'Error al generar feedback: {str(e)}')
+
+            # Limpiar markdown del feedback
+            def clean_markdown(text):
+                if not text: return ''
+                return re.sub(r'^```json|```', '', text.strip(), flags=re.MULTILINE)
+
+            feedback_text = clean_markdown(feedback_text)
+
+            results.append({
+                'questionIndex': i,
+                'isCorrect': is_correct,
+                'userAnswer': user_answer,
+                'correctAnswer': correct_answer,
+                'feedback': feedback_text
+            })
+
+        # Calcular estadísticas globales
+        correct_count = sum(1 for r in results if r['isCorrect'])
+        accuracy = round((correct_count / total_questions * 100), 2) if total_questions > 0 else 0
+
+        summary = {
+            'total': total_questions,
+            'correct': correct_count,
+            'incorrect': total_questions - correct_count,
+            'accuracy': accuracy
+        }
+
+        logger.info(f"Verificación batch completada: {correct_count}/{total_questions} correctas ({accuracy}%)")
+
+        return jsonify({
+            'success': True,
+            'results': results,
+            'summary': summary
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error en submit_all_answers: {str(e)}")
+        return jsonify({'error': f'Error procesando respuestas: {str(e)}'}), 500
+
+# ============================================================
+# ENDPOINT PARA CHAT CON TUTOR IA
+# ============================================================
+@app.route('/api/chat', methods=['POST'])
+def chat_with_ai():
+    """Endpoint para chatear con el tutor IA especializado en ICFES"""
+    try:
+        data = request.json
+        message = data.get('message', '').strip()
+        context = data.get('context', 'general')
+
+        if not message:
+            return jsonify({'error': 'Mensaje vacío'}), 400
+
+        if len(message) > 2000:
+            return jsonify({'error': 'Mensaje demasiado largo (máximo 2000 caracteres)'}), 400
+
+        # Prompt especializado para tutor ICFES
+        prompt = f"""Eres un tutor IA especializado en la preparación para el examen ICFES colombiano.
+Tu nombre es "Tutor ICFES Pro" y eres un experto pedagogo con años de experiencia ayudando a estudiantes colombianos.
+
+INSTRUCCIONES IMPORTANTES:
+1. Responde SIEMPRE en español colombiano, usando un lenguaje claro y educativo
+2. Sé amable, motivador y paciente con los estudiantes
+3. Explica conceptos complejos de manera simple pero precisa
+4. Incluye ejemplos prácticos cuando sea relevante
+5. Si el estudiante comete errores conceptuales, corrígelos gentilmente
+6. Relaciona las explicaciones con el contexto colombiano y el currículo ICFES
+7. Si es apropiado, sugiere estrategias de estudio o recursos adicionales
+8. Mantén respuestas concisas pero completas (no más de 800 palabras)
+
+CONTEXTO DEL MENSAJE: {context}
+
+MENSAJE DEL ESTUDIANTE:
+{message}
+
+Responde como un tutor experto, proporcionando la ayuda más útil posible."""
+
+        try:
+            ai_response = evaluator._make_gemini_request(
+                prompt,
+                temperature=0.7,
+                max_tokens=1500
+            )
+
+            if not ai_response:
+                return jsonify({'error': 'No se pudo generar respuesta'}), 500
+
+            # Limpiar respuesta
+            clean_response = ai_response.strip()
+
+            logger.info(f"Chat IA completado - Longitud respuesta: {len(clean_response)} caracteres")
+
+            return jsonify({
+                'success': True,
+                'response': clean_response,
+                'timestamp': datetime.now().isoformat()
+            }), 200
+
+        except Exception as e:
+            logger.error(f"Error en chat IA: {str(e)}")
+            return jsonify({
+                'error': 'Error interno del servidor',
+                'details': str(e)
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error general en chat: {str(e)}")
+        return jsonify({'error': f'Error procesando mensaje: {str(e)}'}), 500
+
+# ============================================================
 # ENDPOINTS ADMINISTRATIVOS
 # ============================================================
 @app.route('/users', methods=['GET'])
@@ -1279,7 +1463,7 @@ def health_check():
     """Endpoint para verificar el estado del sistema"""
     try:
         test_response = evaluator._make_gemini_request(
-            "Responde solo 'OK' para confirmar conexión.",
+            "Responda solo 'OK' para confirmar conexión.",
             max_tokens=10
         )
         ai_status = "OK" in test_response.upper()
@@ -1335,6 +1519,7 @@ def print_startup_banner():
     print("   - POST /generate-question     - Generar preguntas ICFES")
     print("   - POST /get-feedback          - Retroalimentación individual")
     print("   - POST /evaluate-order         - Evaluar ordenamiento de elementos")
+    print("   - POST /submit-all-answers    - Verificar todas las respuestas (NUEVO)")
     print("\n📄 Análisis de Documentos:")
     print("   - POST /analyze-document      - Análisis PDF/Word completo")
     print("\n📊 Visualización de Datos:")
@@ -1353,6 +1538,6 @@ def print_startup_banner():
 print_startup_banner()
 
 if __name__ == '__main__':
-    print("🌐 Servidor: http://127.0.0.1:5000")
+    print("🌐 Servidor: http://127.0.0.1:5000 ")
     print("=" * 60)
     app.run(debug=True, host='127.0.0.1', port=5000)

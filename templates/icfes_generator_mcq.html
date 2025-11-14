@@ -477,36 +477,6 @@
             color: var(--error) !important;
         }
 
-        .answer-actions {
-            display: flex;
-            gap: var(--space-2);
-            margin-top: var(--space-3);
-            flex-wrap: wrap;
-        }
-
-        .btn-submit {
-            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
-            color: white;
-            border: none;
-            padding: var(--space-3) var(--space-4);
-            border-radius: 10px;
-            font-size: var(--text-sm);
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            min-height: 44px;
-        }
-
-        .btn-submit:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
-        }
-
-        .btn-submit:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
         /* FEEDBACK - RESPONSIVE */
         .feedback-box {
             background: rgba(16, 185, 129, 0.1);
@@ -851,6 +821,19 @@
             </div>
 
             <div class="questions-container" id="questionsContainer"></div>
+
+            <!-- NUEVO: Botón global para verificar todas las respuestas -->
+            <div id="globalSubmitContainer" style="display: none; margin-top: var(--space-6); text-align: center;">
+                <button class="generate-btn" id="submitAllBtn" onclick="submitAllAnswers()">
+                    ✅ Verificar Todas las Respuestas
+                </button>
+            </div>
+
+            <!-- NUEVO: Panel de resultados globales -->
+            <div id="globalResultsPanel" style="display: none; margin-top: var(--space-6);">
+                <h3 style="font-size: var(--text-2xl); margin-bottom: var(--space-4); text-align: center;">📊 Resultados del Intento</h3>
+                <div id="globalResultsTable"></div>
+            </div>
         </div>
     </div>
 
@@ -870,7 +853,7 @@
             userAnswers: {},
             submittedQuestions: new Set(),
             rawQuestionsText: '',
-            generatedQuestionIds: new Set() // Para evitar preguntas repetidas
+            generatedQuestionIds: new Set()
         };
 
         // UTILIDADES
@@ -915,59 +898,38 @@
 
             updateStats: () => {
                 const total = state.questions.length;
-                const answered = state.submittedQuestions.size;
-                const correct = Array.from(state.submittedQuestions).filter(idx => 
-                    state.userAnswers[idx] === state.questions[idx]?.correctAnswer
-                ).length;
-                const accuracy = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-
+                const answered = Object.keys(state.userAnswers).length; // CAMBIO: Contar respuestas seleccionadas
                 document.getElementById('totalQuestions').textContent = total;
                 document.getElementById('answeredQuestions').textContent = answered;
-                document.getElementById('correctAnswers').textContent = correct;
-                document.getElementById('accuracyRate').textContent = accuracy + '%';
-                document.getElementById('statsBar').style.display = total > 0 ? 'grid' : 'none';
+                // Las stats de correctas y precisión se actualizarán después de enviar
+                const statsBar = document.getElementById('statsBar');
+                statsBar.style.display = total > 0 ? 'grid' : 'none';
             },
 
-            // Función mejorada para limpiar completamente el texto de markdown y caracteres especiales
             cleanMarkdown: (text) => {
                 if (!text) return '';
-                
                 return text
-                    // Eliminar todos los tipos de énfasis markdown
-                    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1') // ***texto***
-                    .replace(/\*\*([^*]+)\*\*/g, '$1') // **texto**
-                    .replace(/\*([^*]+)\*/g, '$1') // *texto*
-                    .replace(/_{3}([^_]+)_{3}/g, '$1') // ___texto___
-                    .replace(/_{2}([^_]+)_{2}/g, '$1') // __texto__
-                    .replace(/_([^_]+)_/g, '$1') // _texto_
-                    .replace(/`{3}[^`]*`{3}/g, '') // ```código```
-                    .replace(/`([^`]+)`/g, '$1') // `código`
-                    
-                    // Eliminar encabezados
+                    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    .replace(/_{3}([^_]+)_{3}/g, '$1')
+                    .replace(/_{2}([^_]+)_{2}/g, '$1')
+                    .replace(/_([^_]+)_/g, '$1')
+                    .replace(/`{3}[^`]*`{3}/g, '')
+                    .replace(/`([^`]+)`/g, '$1')
                     .replace(/^#{1,6}\s*/gm, '')
-                    
-                    // Normalizar listas a viñetas simples
                     .replace(/^[-*+]\s+/gm, '• ')
                     .replace(/^\d+\.\s+/gm, '')
-                    
-                    // Eliminar links e imágenes
                     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
                     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
-                    
-                    // Eliminar citas y separadores
                     .replace(/^>\s?/gm, '')
                     .replace(/^[-=]{3,}/gm, '')
-                    .replace(/~{2}([^~]+)~{2}/g, '$1') // ~~tachado~~
-                    
-                    // Limpiar espacios múltiples y saltos de línea
+                    .replace(/~{2}([^~]+)~{2}/g, '$1')
                     .replace(/\n{3,}/g, '\n\n')
                     .replace(/\t/g, '    ')
                     .replace(/ {2,}/g, ' ')
-                    
-                    // Eliminar caracteres especiales problemáticos
                     .replace(/[<>]/g, '')
                     .replace(/&nbsp;/g, ' ')
-                    
                     .trim();
             }
         };
@@ -998,120 +960,76 @@
                                 `;
                             }).join('')}
                         </div>
-                        <div class="answer-actions" id="actions-${index}">
-                            <button class="btn-submit" onclick="submitAnswer(${index})">
-                                Verificar Respuesta
-                            </button>
-                        </div>
+                        <!-- NUEVO: Contenedor para feedback después de enviar -->
+                        <div class="feedback-container" id="feedback-${index}" style="display: none; margin-top: var(--space-3);"></div>
                     </div>
                 `).join('');
 
-                // Limpiar mensajes de alerta
                 document.getElementById('messageContainer').innerHTML = '';
+                
+                // CAMBIO: Mostrar botón global
+                document.getElementById('globalSubmitContainer').style.display = 'block';
+                document.getElementById('globalResultsPanel').style.display = 'none';
+                document.getElementById('globalResultsTable').innerHTML = '';
             },
 
             selectOption: (questionIndex, optionLetter) => {
+                // CAMBIO: No auto-enviar, solo seleccionar
                 if (state.submittedQuestions.has(questionIndex)) return;
 
                 state.userAnswers[questionIndex] = optionLetter;
-                
+
                 const card = document.getElementById(`card-${questionIndex}`);
                 card.querySelectorAll('.option-item').forEach(opt => opt.classList.remove('selected'));
                 card.querySelector(`[data-option="${optionLetter}"]`).classList.add('selected');
+                
+                utils.updateStats(); // Actualizar contador de respondidas
             },
 
-            submit: async (questionIndex) => {
-                const userAnswer = state.userAnswers[questionIndex];
-                if (!userAnswer) {
-                    utils.showMessage('error', '⚠️ Selecciona una respuesta antes de verificar.', 3000);
-                    return;
-                }
-
-                const question = state.questions[questionIndex];
-                const isCorrect = userAnswer === question.correctAnswer;
-                
-                state.submittedQuestions.add(questionIndex);
-                
-                // Deshabilitar opciones
-                const card = document.getElementById(`card-${questionIndex}`);
-                card.classList.add('completed');
-                card.querySelectorAll('.option-item').forEach(opt => opt.classList.add('disabled'));
-                
-                // Marcar respuestas
-                card.querySelectorAll('.option-item').forEach(opt => {
-                    const letter = opt.getAttribute('data-option');
-                    if (letter === question.correctAnswer) {
-                        opt.classList.add('correct');
-                    } else if (letter === userAnswer && !isCorrect) {
-                        opt.classList.add('incorrect');
-                    }
-                });
-
-                // Mostrar feedback
-                await questionManager.showFeedback(questionIndex, isCorrect);
-                utils.updateStats();
-            },
-
-            showFeedback: async (questionIndex, isCorrect) => {
-                const question = state.questions[questionIndex];
-                const actionsDiv = document.getElementById(`actions-${questionIndex}`);
-
-                // Loading
-                actionsDiv.innerHTML = '<div class="loading-spinner"></div>';
-
-                try {
-                    let feedbackText = question.explanation || 'Sin explicación disponible.';
+            // NUEVO: Método para mostrar feedback después de enviar todas
+            showFeedbackForAll: (results) => {
+                results.forEach(result => {
+                    const index = result.questionIndex;
+                    const question = state.questions[index];
+                    const isCorrect = result.isCorrect;
                     
-                    // Obtener feedback del backend
-                    try {
-                        const response = await fetch(`${CONFIG.API_URL}/get-feedback`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                question: `${question.question}\n${question.options.join('\n')}`,
-                                answer: question.options.find(opt => opt.charAt(0).toLowerCase() === state.userAnswers[questionIndex])
-                            })
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.feedback) {
-                                feedbackText = data.feedback;
-                            }
+                    // Deshabilitar opciones
+                    const card = document.getElementById(`card-${index}`);
+                    card.classList.add('completed');
+                    card.querySelectorAll('.option-item').forEach(opt => opt.classList.add('disabled'));
+                    
+                    // Marcar respuestas
+                    card.querySelectorAll('.option-item').forEach(opt => {
+                        const letter = opt.getAttribute('data-option');
+                        if (letter === question.correctAnswer) {
+                            opt.classList.add('correct');
+                        } else if (letter === result.userAnswer && !isCorrect) {
+                            opt.classList.add('incorrect');
+                        } else if (letter === result.userAnswer && isCorrect) {
+                            opt.classList.add('selected');
                         }
-                    } catch (apiError) {
-                        console.log('Usando explicación local');
-                    }
-
-                    // Limpiar texto completamente
-                    const cleanFeedback = utils.cleanMarkdown(feedbackText);
-
-                    // Construir feedback conciso
-                    const resultMessage = isCorrect ? '✅ ¡Respuesta Correcta!' : '❌ Respuesta Incorrecta';
-                    const errorAnalysis = isCorrect ? '' : `\n\nQué falló: ${getErrorAnalysis(state.userAnswers[questionIndex])}`;
-                    const improvementTip = `\n\nCómo mejorar: ${getImprovementTip(document.getElementById('competenciaSelect').value)}`;
-                    const motivation = isCorrect 
-                        ? '\n\n¡Excelente! Sigue practicando.' 
-                        : '\n\n💪 Cada error es una oportunidad. Analiza y aprende.';
-
-                    actionsDiv.innerHTML = `
+                    });
+                    
+                    // Mostrar feedback en el contenedor específico
+                    const feedbackContainer = document.getElementById(`feedback-${index}`);
+                    feedbackContainer.style.display = 'block';
+                    feedbackContainer.innerHTML = `
                         <div class="feedback-box ${isCorrect ? 'success' : 'error'}">
-                            <div class="feedback-title">${resultMessage}</div>
+                            <div class="feedback-title">${isCorrect ? '✅ Correcto' : '❌ Incorrecto'}</div>
                             <div class="feedback-content">
-                                ${cleanFeedback}${errorAnalysis}${improvementTip}${motivation}
+                                <div class="feedback-section"><strong>Tu respuesta:</strong> ${result.userAnswer?.toUpperCase()}</div>
+                                <div class="feedback-section"><strong>Respuesta correcta:</strong> ${question.correctAnswer?.toUpperCase()}</div>
+                                <div class="feedback-section"><strong>Explicación:</strong><br>${utils.cleanMarkdown(result.feedback)}</div>
                             </div>
                         </div>
                     `;
-
-                } catch (error) {
-                    // Fallback minimalista
-                    actionsDiv.innerHTML = `
-                        <div class="feedback-box ${isCorrect ? 'success' : 'error'}">
-                            <div class="feedback-title">${isCorrect ? '✅ ¡Correcto!' : '❌ Incorrecto'}</div>
-                            <div class="feedback-content">${utils.cleanMarkdown(question.explanation)}</div>
-                        </div>
-                    `;
-                }
+                });
+                
+                // Actualizar stats finales
+                const total = results.length;
+                const correct = results.filter(r => r.isCorrect).length;
+                document.getElementById('correctAnswers').textContent = correct;
+                document.getElementById('accuracyRate').textContent = Math.round((correct / total) * 100) + '%';
             }
         };
 
@@ -1120,9 +1038,139 @@
             questionManager.selectOption(questionIndex, optionLetter);
         };
 
-        window.submitAnswer = async (questionIndex) => {
-            await questionManager.submit(questionIndex);
+        // NUEVO: Función para enviar todas las respuestas
+        window.submitAllAnswers = async () => {
+            if (state.questions.length === 0) return;
+            
+            const totalQuestions = state.questions.length;
+            const answeredQuestions = Object.keys(state.userAnswers).length;
+            
+            // Validar que se respondieron todas
+            if (answeredQuestions < totalQuestions) {
+                utils.showMessage('error', `⚠️ Responde todas las preguntas antes de verificar. Te faltan ${totalQuestions - answeredQuestions} preguntas.`, 4000);
+                // Scroll a la primera pregunta sin responder
+                for (let i = 0; i < totalQuestions; i++) {
+                    if (!state.userAnswers[i]) {
+                        document.getElementById(`card-${i}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        break;
+                    }
+                }
+                return;
+            }
+            
+            // Preparar datos para el backend
+            const submitData = state.questions.map((q, index) => ({
+                question: q.question,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                userAnswer: state.userAnswers[index]
+            }));
+            
+            const btn = document.getElementById('submitAllBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Verificando respuestas...';
+            
+            try {
+                const response = await fetch(`${CONFIG.API_URL}/submit-all-answers`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ questions: submitData })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Marcar todas como enviadas
+                    state.submittedQuestions = new Set(state.questions.map((_, i) => i));
+                    
+                    // Ocultar botón global
+                    document.getElementById('globalSubmitContainer').style.display = 'none';
+                    
+                    // Mostrar tabla de resultados
+                    renderGlobalResultsTable(data.summary, data.results);
+                    
+                    // Mostrar feedback debajo de cada pregunta
+                    questionManager.showFeedbackForAll(data.results);
+                    
+                    utils.showMessage('success', `🎉 Resultados listos! Precisión: ${data.summary.accuracy}%`, 5000);
+                } else {
+                    utils.showMessage('error', `❌ Error: ${data.error || 'No se pudieron verificar las respuestas'}`, 5000);
+                }
+            } catch (error) {
+                console.error('❌ Error enviando respuestas:', error);
+                utils.showMessage('error', '🔌 Error de conexión al verificar respuestas.', 5000);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '✅ Verificar Todas las Respuestas';
+            }
         };
+        
+        // NUEVO: Renderizar tabla de resultados globales
+        function renderGlobalResultsTable(summary, results) {
+            const tableHTML = `
+                <div style="background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: var(--space-5); margin-bottom: var(--space-6);">
+                    <h4 style="font-size: var(--text-xl); margin-bottom: var(--space-4);">📈 Resumen del Intento</h4>
+                    <div class="stats-bar" style="display: grid; margin-bottom: var(--space-4);">
+                        <div class="stat-item">
+                            <div class="stat-value">${summary.total}</div>
+                            <div class="stat-label">Total Preguntas</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${summary.correct}</div>
+                            <div class="stat-label">Correctas</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${summary.incorrect}</div>
+                            <div class="stat-label">Incorrectas</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${summary.accuracy}%</div>
+                            <div class="stat-label">Precisión</div>
+                        </div>
+                    </div>
+                    
+                    <h5 style="font-size: var(--text-lg); margin-bottom: var(--space-3);">Detalle por Pregunta:</h5>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: var(--text-sm);">
+                            <thead>
+                                <tr style="background: rgba(102, 126, 234, 0.1);">
+                                    <th style="padding: var(--space-2); border: 1px solid var(--border); text-align: left;">#</th>
+                                    <th style="padding: var(--space-2); border: 1px solid var(--border); text-align: left;">Estado</th>
+                                    <th style="padding: var(--space-2); border: 1px solid var(--border); text-align: left;">Tu Respuesta</th>
+                                    <th style="padding: var(--space-2); border: 1px solid var(--border); text-align: left;">Correcta</th>
+                                    <th style="padding: var(--space-2); border: 1px solid var(--border); text-align: left;">Tema</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${results.map(r => {
+                                    const q = state.questions[r.questionIndex];
+                                    return `
+                                        <tr style="background: ${r.isCorrect ? 'rgba(16, 185, 129, 0.05)' : 'rgba(239, 68, 68, 0.05)'};">
+                                            <td style="padding: var(--space-2); border: 1px solid var(--border);">${r.questionIndex + 1}</td>
+                                            <td style="padding: var(--space-2); border: 1px solid var(--border);">
+                                                ${r.isCorrect ? '✅ Correcto' : '❌ Incorrecto'}
+                                            </td>
+                                            <td style="padding: var(--space-2); border: 1px solid var(--border);">
+                                                ${r.userAnswer?.toUpperCase()}
+                                            </td>
+                                            <td style="padding: var(--space-2); border: 1px solid var(--border);">
+                                                ${q.correctAnswer?.toUpperCase()}
+                                            </td>
+                                            <td style="padding: var(--space-2); border: 1px solid var(--border);">
+                                                ${q.question.substring(0, 50)}...
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('globalResultsTable').innerHTML = tableHTML;
+            document.getElementById('globalResultsPanel').style.display = 'block';
+        }
 
         window.generateQuestions = async () => {
             const competencia = document.getElementById('competenciaSelect').value;
@@ -1130,7 +1178,6 @@
             const numQuestions = parseInt(document.getElementById('numQuestionsInput').value);
             const useCustomKnowledge = document.getElementById('customKnowledgeSelect').value === 'true';
 
-            // Validaciones
             if (!competencia) {
                 utils.showMessage('error', '⚠️ Selecciona una competencia para continuar.');
                 return;
@@ -1141,13 +1188,11 @@
                 return;
             }
 
-            // Resetear estado
             state.questions = [];
             state.userAnswers = {};
             state.submittedQuestions.clear();
             state.rawQuestionsText = '';
 
-            // UI Loading
             const btn = document.getElementById('generateBtn');
             btn.disabled = true;
             btn.textContent = '⏳ Generando preguntas...';
@@ -1159,7 +1204,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         competencia, num_questions: numQuestions, dificultad, use_custom_knowledge: useCustomKnowledge,
-                        previous_questions: Array.from(state.generatedQuestionIds) // Enviar IDs previos para evitar repeticiones
+                        previous_questions: Array.from(state.generatedQuestionIds)
                     })
                 });
 
@@ -1169,17 +1214,14 @@
                     state.rawQuestionsText = data.questions;
                     state.questions = utils.parseQuestions(data.questions);
                     
-                    // Guardar IDs de preguntas generadas para evitar repeticiones futuras
                     if (data.question_ids) {
                         data.question_ids.forEach(id => state.generatedQuestionIds.add(id));
                     }
                     
-                    // Mostrar resultados
                     document.getElementById('resultsSection').style.display = 'block';
                     questionManager.render();
                     utils.updateStats();
                     
-                    // Scroll suave
                     document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
                     
                     utils.showMessage('success', `🎉 ¡${state.questions.length} preguntas generadas! Empieza a practicar.`, 3000);
@@ -1249,13 +1291,11 @@
         };
 
         window.resetGenerator = () => {
-            // Resetear estado
             state.questions = [];
             state.userAnswers = {};
             state.submittedQuestions.clear();
             state.rawQuestionsText = '';
 
-            // Resetear UI
             document.getElementById('resultsSection').style.display = 'none';
             document.getElementById('questionsContainer').innerHTML = '';
             document.getElementById('messageContainer').innerHTML = '';
@@ -1264,37 +1304,14 @@
             document.getElementById('dificultadSelect').value = 'medio';
             document.getElementById('customKnowledgeSelect').value = 'true';
             
+            // NUEVO: Resetear paneles globales
+            document.getElementById('globalSubmitContainer').style.display = 'none';
+            document.getElementById('globalResultsPanel').style.display = 'none';
+            document.getElementById('globalResultsTable').innerHTML = '';
+            
             utils.updateStats();
             utils.showMessage('success', '🔄 Generador reiniciado. ¡Listo para una nueva práctica!', 3000);
         };
-
-        // FUNCIONES AUXILIARES
-        function getErrorAnalysis(selectedLetter) {
-            const errorPatterns = {
-                'a': 'Elegiste la primera opción sin analizar todas.',
-                'b': 'Te confundiste con una opción parcialmente correcta.',
-                'c': 'Caíste en un distractor diseñado para confundir.',
-                'd': 'Elegiste por descarte sin verificar bien cada alternativa.'
-            };
-            return errorPatterns[selectedLetter] || 'Necesitas reforzar la comprensión del tema.';
-        }
-
-        function getImprovementTip(competencia) {
-            const tips = {
-                'Lectura Crítica': 'Identifica ideas principales e inferencias en textos complejos.',
-                'Matemáticas': 'Revisa fundamentos y practica problemas paso a paso.',
-                'Ciencias Naturales': 'Enfócate en conceptos clave y relaciones causa-efecto.',
-                'Ciencias Sociales': 'Conecta eventos históricos con su impacto social.',
-                'Inglés': 'Practica comprensión lectora y vocabulario académico.',
-                'Competencia Ciudadana': 'Reflexiona sobre derechos y participación democrática.',
-                'Física': 'Domina las leyes fundamentales y su aplicación práctica.',
-                'Química': 'Memoriza reacciones básicas y estructura de la materia.',
-                'Biología': 'Enfócate en procesos celulares, genética y ecosistemas.',
-                'Historia': 'Crea líneas de tiempo para conectar eventos causales.',
-                'Geografía': 'Estudia mapas, regiones y procesos geográficos.'
-            };
-            return tips[competencia] || 'Revisa los conceptos fundamentales y practica más.';
-        }
 
         // INICIALIZACIÓN
         document.addEventListener('DOMContentLoaded', () => {
@@ -1303,4 +1320,4 @@
         });
     </script>
 </body>
-</html>
+</html>s

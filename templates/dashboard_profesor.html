@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICFES Pro - Dashboard</title>
+    <title>ICFES Pro - Dashboard Profesor</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         * {
@@ -25,7 +25,7 @@
             position: fixed;
             width: 100%;
             height: 100%;
-            background: 
+            background:
                 radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
                 radial-gradient(circle at 80% 80%, rgba(99, 102, 241, 0.2) 0%, transparent 50%),
                 radial-gradient(circle at 40% 20%, rgba(168, 85, 247, 0.2) 0%, transparent 50%);
@@ -475,7 +475,7 @@
     <div class="floating-particles" id="particles"></div>
 
     <nav class="navbar">
-        <div class="logo">ICFES Pro</div>
+        <div class="logo">ICFES Pro - Profesores</div>
         <div class="user-section">
             <div class="user-avatar" id="userAvatar">P</div>
             <span class="user-name" id="userName">Profesor</span>
@@ -485,8 +485,8 @@
 
     <div class="main-container">
         <div class="hero-section">
-            <h1 class="hero-title">Tu Centro de Aprendizaje</h1>
-            <p class="hero-subtitle">Herramientas inteligentes para transformar tu educación</p>
+            <h1 class="hero-title">Panel de Profesores</h1>
+            <p class="hero-subtitle">Herramientas avanzadas para docentes y administradores</p>
         </div>
 
         <div class="stats-grid">
@@ -506,9 +506,9 @@
                 <div class="stat-label">Tasa de éxito</div>
             </div>
             <div class="stat-card">
-                <div class="stat-icon">⏱️</div>
-                <div class="stat-number" id="studyHours">0</div>
-                <div class="stat-label">Horas</div>
+                <div class="stat-icon">👥</div>
+                <div class="stat-number" id="totalStudents">0</div>
+                <div class="stat-label">Estudiantes</div>
             </div>
         </div>
 
@@ -518,65 +518,20 @@
                 <h2 class="section-title">Herramientas Principales</h2>
             </div>
             <div class="tools-grid">
-                <div class="tool-card" onclick="openTool('/pdf-evaluation')">
-                    <span class="tool-badge">Popular</span>
-                    <span class="tool-icon">📄</span>
-                    <div class="tool-title">Análisis de PDF</div>
-                    <div class="tool-description">Sube tus evaluaciones y obtén retroalimentación inteligente instantánea con análisis detallado</div>
-                    <button class="tool-btn">Comenzar Análisis</button>
-                </div>
-
-                <div class="tool-card" onclick="openTool('#')">
-                    <span class="tool-badge">IA Avanzada</span>
-                    <span class="tool-icon">🤖</span>
-                    <div class="tool-title">Entrenador de IA</div>
-                    <div class="tool-description">Entrena tu IA con PDFs y genera preguntas personalizadas con análisis gráfico detallado</div>
-                    <button class="tool-btn">Entrenar IA</button>
-                </div>
-
-                <div class="tool-card" onclick="openTool('/generator')">
-                    <span class="tool-badge">IA</span>
-                    <span class="tool-icon">✨</span>
-                    <div class="tool-title">Generador de Preguntas</div>
-                    <div class="tool-description">Crea preguntas personalizadas con IA adaptadas a cualquier tema y nivel de dificultad</div>
-                    <button class="tool-btn">Generar Preguntas</button>
-                </div>
-
-                <div class="tool-card" onclick="openTool('/simulator')">
-                    <span class="tool-badge">Nuevo</span>
-                    <span class="tool-icon">🎯</span>
-                    <div class="tool-title">Simulador ICFES</div>
-                    <div class="tool-description">Practica con exámenes reales en un ambiente simulado con cronómetro y resultados instantáneos</div>
-                    <button class="tool-btn">Iniciar Simulacro</button>
-                </div>
-
-                <div class="tool-card" onclick="openTool('/order-exercise')">
-                    <span class="tool-badge">Interactivo</span>
-                    <span class="tool-icon">🔄</span>
-                    <div class="tool-title">Ejercicios de Reordenamiento</div>
-                    <div class="tool-description">Ordena elementos arrastrándolos y recibe retroalimentación detallada con IA sobre tu respuesta</div>
-                    <button class="tool-btn">Practicar Ordenamiento</button>
-                </div>
-
-                <div class="tool-card" onclick="openTool('#')">
-                    <span class="tool-icon">📈</span>
-                    <div class="tool-title">Analytics Avanzado</div>
-                    <div class="tool-description">Visualiza tu progreso con gráficos interactivos e identifica patrones de aprendizaje</div>
-                    <button class="tool-btn">Ver Estadísticas</button>
-                </div>
-
-                <div class="tool-card" onclick="openTool('#')">
+                <div class="tool-card" onclick="openTool('/chat')">
+                    <span class="tool-badge">Tutor IA</span>
                     <span class="tool-icon">🧠</span>
-                    <div class="tool-title">Asistente IA</div>
-                    <div class="tool-description">Tu tutor personal con inteligencia artificial para resolver dudas en tiempo real</div>
-                    <button class="tool-btn">Chatear Ahora</button>
+                    <div class="tool-title">Tutor de IA</div>
+                    <div class="tool-description">Tu asistente inteligente para resolver dudas y explicar conceptos complejos en tiempo real</div>
+                    <button class="tool-btn">Chatear con Tutor</button>
                 </div>
 
-                <div class="tool-card" onclick="openTool('#')">
+                <div class="tool-card" onclick="openTool('/library')">
+                    <span class="tool-badge">Recursos</span>
                     <span class="tool-icon">📚</span>
                     <div class="tool-title">Biblioteca Digital</div>
                     <div class="tool-description">Accede a miles de recursos, resúmenes y material de estudio organizado por temas</div>
-                    <button class="tool-btn">Explorar Contenido</button>
+                    <button class="tool-btn">Explorar Biblioteca</button>
                 </div>
             </div>
         </div>
@@ -584,7 +539,7 @@
         <div class="tools-section">
             <div class="section-header">
                 <span class="section-icon">👨‍🏫</span>
-                <h2 class="section-title">Para Profesores</h2>
+                <h2 class="section-title">Herramientas de Gestión</h2>
             </div>
             <div class="tools-grid">
                 <div class="tool-card" onclick="openTool('#')">
@@ -606,6 +561,13 @@
                     <div class="tool-title">Reportes de Rendimiento</div>
                     <div class="tool-description">Genera reportes detallados individuales y grupales con insights accionables</div>
                     <button class="tool-btn">Ver Reportes</button>
+                </div>
+
+                <div class="tool-card" onclick="openTool('#')">
+                    <span class="tool-icon">⚙️</span>
+                    <div class="tool-title">Configuración Avanzada</div>
+                    <div class="tool-description">Personaliza parámetros de IA, configuraciones de evaluación y preferencias del sistema</div>
+                    <button class="tool-btn">Configurar</button>
                 </div>
             </div>
         </div>
@@ -654,13 +616,13 @@
                 evaluations: 47,
                 questions: 1250,
                 successRate: '87%',
-                studyHours: 156
+                students: 234
             };
 
             animateValue('totalEvaluations', 0, stats.evaluations, 2000);
             animateValue('totalQuestions', 0, stats.questions, 2000);
-            animateValue('studyHours', 0, stats.studyHours, 2000);
-            
+            animateValue('totalStudents', 0, stats.students, 2000);
+
             setTimeout(() => {
                 document.getElementById('successRate').textContent = stats.successRate;
             }, 1000);
