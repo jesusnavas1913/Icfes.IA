@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key')
 
+
 # CORS configurado para desarrollo y producción
 # Permitir todos los orígenes para desarrollo local
 CORS(app, methods=["GET", "POST", "OPTIONS"])
